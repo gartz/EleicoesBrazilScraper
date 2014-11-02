@@ -1,7 +1,8 @@
 var fs = require('fs');
+var utils = require('utils');
 var casper = require('casper').create({
   pageSettings: {
-    loadImages: false,
+    loadImages: true,
     loadPlugins: false,
     localToRemoteUrlAccessEnabled: true
   },
@@ -9,6 +10,9 @@ var casper = require('casper').create({
     width: 1280,
     height: 720
   },
+  clientScripts: [
+    'scraper.js'
+  ],
   verbose: true,
   logLevel: "warning"
 });
@@ -143,47 +147,17 @@ function formEvaluator( formId ){
 };
 
 function scrapePage(){
-
-  //TODO: fix scraper!
-
-  var topics = this.evaluate( function (){
-    return document.querySelectorAll('table th[align="center"]');
-  });
-
-  var boletim = new Boletim();
-  var self = this;
-  var position = 0;
-  Array.prototype.forEach.call( topics, function ( element ){
-    if( !element ) return;
-    self.log( 'Scraping topic: ' + element.textContent, 'info' );
-    var contents = [];
-    boletim[ element.textContent ] = contents;
-    var children = self.evaluate( function (position){
-      var elements = document.querySelectorAll('table th[align="center"]');
-      var results = [];
-      var children = elements[ position ].parentElement.parentElement.querySelectorAll('th, td');
-      Array.prototype.forEach.call( children, function ( element ){
-        if(!element || !element.nodeName || !element.textContent) return;
-        results.push({
-          nodeName: element.nodeName,
-          textContent: element.textContent
-        });
-      });
-      return results;
-    }, position );
-    Array.prototype.forEach.call( children, function ( element ){
-      if (!element) return;
-        var obj = {};
-        obj[ element.nodeName ] = element.textContent;
-        contents.push(obj);
-    });
-    position++;
+  var scrapeData = this.evaluate( function (){
+    dataLoad();
+    var stringifyScrapeData = JSON.stringify( scrapeData );
+    __utils__.echo(stringifyScrapeData);
+    return scrapeData;
   });
 
   var filename = getFilename( getFormValues.call(this) );
-  fs.write( filename + '.json', JSON.stringify( boletim ), 'w' );
+  fs.write( filename + '.json', utils.serialize( scrapeData ), 'w' );
 
-  data.push( boletim );
+  data.push( scrapeData );
 
   this.echo( 'Page scraped =====================================================' );
 }
