@@ -50,10 +50,6 @@ InputList.prototype.getLast = function (){
   return this['P0_X_SECAO'];
 };
 
-function Boletim(){
-  // Data abot the boletim
-}
-
 var data = [];
 var inputs = new InputList();
 
@@ -101,6 +97,7 @@ function fillInput( input ){
     this.log( 'No ' + input.id + ' found.', "error" );
     return;
   }
+  this.echo( 'Detect ' + input.id + ': ' + input.value );
   var previous = null;
   var shiftValues = input.shiftValues;
   this.log( 'Options founded: ' + options.length, 'info' );
@@ -139,7 +136,8 @@ function fillInput( input ){
     input.current = input.current.next;
     if( !input.current ){
       this.log( 'Input value ' + input.value + ' not found!', 'error' );
-      input.value = null;
+      input.value = input.first && input.first.value || null;
+      input.current = input.first;
       break;
     }
   }
@@ -166,7 +164,7 @@ function formEvaluator( formId ){
 
 function scrapePage(){
   var scraperData = {};
-  
+
   scraperData = this.evaluate( function (){
     dataLoad( __utils__.echo );
     var stringifyScrapeData = JSON.stringify( scrapeData );
@@ -225,12 +223,11 @@ function updateForm( input, value ){
     input = input.children;
   }
 
-  this.wait( 50, function (){
+  this.wait( 150, function (){
     this.then( recursiveScraper );
   });
 }
 
-var lastInput;
 function recursiveScraper(){
   pageChanged.apply( this );
 
@@ -258,33 +255,30 @@ function recursiveScraper(){
   this.log( 'regionHeadersLength: ' + regionHeaderLength, 'info' );
   if( regionHeaderLength === 1 ){
     this.evaluate( formEvaluator, 'PESQUISAR' );
-    this.wait( 300, function (){
+    this.wait( 150, function (){
       this.then( recursiveScraper );
     });
     return;
   }
 
   // Page ready to be scraped:
-  this.wait( 300, function(){
-    scrapePage.call( this );
+  scrapePage.call( this );
 
-    // Move to the next page:
-    this.echo( 'Moving to the next... ' );
+  // Move to the next page:
+  this.echo( 'Moving to the next... ' );
 
-    if (input.current.next){
-      updateForm.call( this, input, input.current.next.value );
-    } else {
-      var parentInput = input.parent;
-      while( parentInput && !parentInput.current.next ){
-        parentInput = parentInput.parent;
-      }
-      if (!parentInput){
-        return;
-      }
-      updateForm.call( this, parentInput, parentInput.current.next.value );
+  if (input.current.next){
+    updateForm.call( this, input, input.current.next.value );
+  } else {
+    var parentInput = input.parent;
+    while( parentInput && !parentInput.current.next ){
+      parentInput = parentInput.parent;
     }
-  });
-
+    if (!parentInput){
+      return;
+    }
+    updateForm.call( this, parentInput, parentInput.current.next.value );
+  }
 }
 
 casper.then(function () {
