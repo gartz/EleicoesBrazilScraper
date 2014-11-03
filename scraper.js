@@ -1,11 +1,15 @@
 var scrapeData = {};
-function dataLoad(){
-  var tables =  document.querySelectorAll('tbody > tr:nth-child(2) > td > table:nth-child(1n+3)');
+function dataLoad( log ){
+  log = log || console.log.bind(console);
+  var tables =  document.querySelectorAll('tbody tr td table');
+  tables = Array.prototype.slice.call( tables, 5 );
   var level = scrapeData;
   var levels = [];
+  log( 'Tables found: ' + tables.length );
   Array.prototype.forEach.call(tables, function( table ){
     var header = table.querySelector('th');
     header = header && header.textContent;
+    log( header );
     level[header] = {};
     level = level[header];
     levels.push(header);
@@ -145,6 +149,6 @@ function dataLoad(){
       }
       return;
     }
-    
+
   });
 }

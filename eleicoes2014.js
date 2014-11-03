@@ -112,6 +112,10 @@ function fillInput( input ){
       this.log( 'value scaped...', 'info' );
       return;
     }
+    if (input.values[value]){
+      // Don't repeat values!
+      return;
+    }
     var current = {
       value: value,
       next: null
@@ -125,6 +129,19 @@ function fillInput( input ){
     previous = current;
     input.values[value] = current;
   }.bind(this) );
+
+  // Update current input
+  input.current = input.current || input.first;
+  if (!input.current) {
+    return;
+  }
+  while( input.current.value !== input.value){
+    input.current = input.current.next;
+    if( !input.current ){
+      this.log( 'Input value ' + input.value + ' not found!', 'error' );
+      break;
+    }
+  }
 }
 
 casper.start( initialPage );
@@ -147,17 +164,19 @@ function formEvaluator( formId ){
 };
 
 function scrapePage(){
-  var scrapeData = this.evaluate( function (){
-    dataLoad();
+  var scraperData = {};
+  
+  scraperData = this.evaluate( function (){
+    dataLoad( __utils__.echo );
     var stringifyScrapeData = JSON.stringify( scrapeData );
-    __utils__.echo(stringifyScrapeData);
+    __utils__.log( stringifyScrapeData, 'info' );
     return scrapeData;
   });
 
   var filename = getFilename( getFormValues.call(this) );
-  fs.write( filename + '.json', utils.serialize( scrapeData ), 'w' );
+  fs.write( filename + '.json', utils.serialize( scraperData ), 'w' );
 
-  data.push( scrapeData );
+  data.push( scraperData );
 
   this.echo( 'Page scraped =====================================================' );
 }
@@ -182,6 +201,34 @@ function moveNext( input ){
   return;
 }
 
+function updateForm( input, value ){
+  var formData = {};
+  formData[ input.name ] = value;
+  this.fill( 'form', formData );
+  this.evaluate( function( formID, formValue){
+    var selecteds = document.querySelectorAll('#' + formID + ' [selected]');
+    Array.prototype.forEach.call( selecteds, function (el){
+      el.removeAttribute('selected');
+    });
+    var el = document.querySelector( '#' + formID + ' [value="' + formValue + '"]' );
+    el.setAttribute('selected', 'selected');
+  }, input.id, value );
+  this.evaluate( formEvaluator, input.id );
+  this.echo( 'Evaluate form change: ' + input.id + ' TO: ' + value );
+
+  while( input ){
+    input.values = [];
+    input.value = null
+    input.current = null;
+    input.first = null;
+    input = input.children;
+  }
+
+  this.wait( 50, function (){
+    this.then( recursiveScraper );
+  });
+}
+
 var lastInput;
 function recursiveScraper(){
   pageChanged.apply( this );
@@ -189,78 +236,64 @@ function recursiveScraper(){
   // select first input to fill all of then
   fillAllInputs.call( this );
 
-  var input;
-  for( var k in inputs ) if( inputs.hasOwnProperty(k) ){
-    this.echo( 'Input: ' + inputs[k].id + ' Current value: ' + inputs[k].value );
-    if( !input && ( !inputs[k].value || inputs[k].value == '0' ) ){
-      input = inputs[k];
+  var input = inputs.getFirst();
+  while( input.value && input.value != '0' && ( input.value in input.values ) ){
+    if( !input.children ){
+      break;
     }
+    input = input.children;
   }
-  if( !input ){
-    this.echo( 'End of the tree search.' );
-
-    var regionHeaderLength = this.evaluate(function (){
-      return document.querySelectorAll('.t15RegionHeader').length;
-    });
-
-    this.log( 'regionHeadersLength: ' + regionHeaderLength, 'info' );
-    if( regionHeaderLength === 1 ){
-      this.evaluate( formEvaluator, 'PESQUISAR' );
-
-      this.then( recursiveScraper );
+  if( !input.value || input.value == '0' || !( input.value in input.values ) ){
+    if( !input.first ){
+      updateForm.call( this, input.parent, input.parent.value );
       return;
     }
+    updateForm.call( this, input, input.first.value );
+    return;
+  }
+  var regionHeaderLength = this.evaluate(function (){
+    return document.querySelectorAll('.t15RegionHeader').length;
+  });
+  this.log( 'regionHeadersLength: ' + regionHeaderLength, 'info' );
+  if( regionHeaderLength === 1 ){
+    this.evaluate( formEvaluator, 'PESQUISAR' );
+    this.wait( 300, function (){
+      this.then( recursiveScraper );
+    });
+    return;
+  }
 
-    // Page ready to be scraped:
+  // Page ready to be scraped:
+  this.wait( 300, function(){
     scrapePage.call( this );
 
     // Move to the next page:
     this.echo( 'Moving to the next... ' );
-    moveNext.call( this, lastInput );
 
-    if( !lastInput.current ){
-      while( !lastInput.current && lastInput.parent ){
-        lastInput = lastInput.parent;
+    if (input.current.next){
+      updateForm.call( this, input, input.current.next.value );
+    } else {
+      var parentInput = input.parent;
+      while( parentInput && !parentInput.current.next ){
+        parentInput = parentInput.parent;
       }
-      this.echo( 'Moving to the parent...' );
-      this.echo( 'Input: ' + lastInput.id );
-      while( lastInput && moveNext.call( this, lastInput ) ){
-        lastInput = lastInput.parent;
+      if (!parentInput){
+        return;
       }
+      updateForm.call( this, parentInput, parentInput.current.next.value );
     }
+  });
 
-    return;
-  }
-  if ( !input.first ){
-    this.log( 'No values found in this input ['+ input.id +'], updating last input value', 'info');
-    input = input.parent;
-  }
-  this.echo( 'Selected input: ' + input.id );
-  this.echo( 'First value: ' + input.first.value );
-  input.current = input.first;
-  lastInput = input;
-
-  var formData = {};
-  formData[ input.name ] = input.first.value;
-  this.fill( 'form', formData );
-  this.evaluate( formEvaluator, input.id );
-
-  this.then( recursiveScraper );
 }
 
 casper.then(function () {
+  debugger;
   this.echo('Reseting scraper to start the search');
   fillAllInputs.apply(this);
 
   // Reset the scraper status
-  var input = inputs.getFirst().children;
-  var formData = {};
-  formData[ input.name ] = input.first.value;
-  this.fill( 'form', formData );
-  this.evaluate( formEvaluator, input.id );
-  this.echo( 'Evaluate form change: ' + input.id + ' TO: ' + input.first.value );
-
-  this.then( recursiveScraper );
+  var input = inputs.getFirst();
+  updateForm.call( this, input, input.first.value );
 });
 
 casper.run(function() {
