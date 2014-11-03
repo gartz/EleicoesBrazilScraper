@@ -139,6 +139,7 @@ function fillInput( input ){
     input.current = input.current.next;
     if( !input.current ){
       this.log( 'Input value ' + input.value + ' not found!', 'error' );
+      input.value = null;
       break;
     }
   }
