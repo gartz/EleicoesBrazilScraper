@@ -285,6 +285,8 @@ function recursiveScraper(){
   this.echo( 'Moving to the next... ' );
 
   if (input.current.next){
+    // Stop when 'to' value was scraped
+    if( input.current.value == input.to ) return;
     updateForm.call( this, input, input.current.next.value );
   } else {
     var parentInput = input.parent;
