@@ -18,6 +18,11 @@ var casper = require('casper').create({
 });
 
 var initialPage = 'http://inter04.tse.jus.br/ords/eletse/f?p=20103:1:2008412469511874';
+var cliOptions = {
+  url: casper.cli.options.url || initialPage,
+  from: String.prototype.split.call( casper.cli.options.from || '', ',' ),
+  to: String.prototype.split.call( casper.cli.options.to || '', ',' )
+};
 
 function SelectInput(id, name, parent){
   this.id = id;
@@ -26,6 +31,8 @@ function SelectInput(id, name, parent){
   this.values = {}; // possible values to navigate
   this.first = null; // The first value
   this.current = null;
+  this.from = null; // Where is the begin value
+  this.to = null; // Where is the finish value
   this.parent = parent || null; // Parent input
   this.children = null; // Children input
   if (this.parent){
@@ -123,6 +130,15 @@ function fillInput( input ){
     } else {
       previous.next = current;
     }
+
+    // Override the first value when there is setting to start from
+    // Check if the parent input is also on the from value
+    if( input.from && current.value == input.from ) {
+      if( !input.parent || input.parent.current && input.parent.from == input.parent.current.value ){
+        input.first = current;
+      }
+    }
+
     previous = current;
     input.values[value] = current;
   }.bind(this) );
@@ -143,7 +159,7 @@ function fillInput( input ){
   }
 }
 
-casper.start( initialPage );
+casper.start( cliOptions.url );
 
 function fillAllInputs() {
   // Add all the values inside the fields founded to their object input representation
@@ -160,7 +176,7 @@ function fillAllInputs() {
 function formEvaluator( formId ){
   // Do a submit call inside the page
   doSubmit( formId );
-};
+}
 
 function scrapePage(){
   var scraperData = {};
@@ -217,7 +233,7 @@ function updateForm( input, value ){
 
   while( input ){
     input.values = [];
-    input.value = null
+    input.value = null;
     input.current = null;
     input.first = null;
     input = input.children;
@@ -235,6 +251,7 @@ function recursiveScraper(){
   fillAllInputs.call( this );
 
   var input = inputs.getFirst();
+
   while( input.value && input.value != '0' && ( input.value in input.values ) ){
     if( !input.children ){
       break;
@@ -283,11 +300,32 @@ function recursiveScraper(){
 
 casper.then(function () {
   debugger;
+
   this.echo('Reseting scraper to start the search');
+
+  var input = inputs.getFirst();
+
+  // Fill from foreced values in the inputs
+  cliOptions.from.forEach(function (option) {
+    if( option === '' ) return;
+    input.from = option;
+    input = input.children;
+  });
+
+  input = inputs.getFirst();
+
+  // Fill to foreced values in the inputs
+  cliOptions.to.forEach(function (option) {
+    if( option === '' ) return;
+    input.to = option;
+    input = input.children;
+  });
+
+  input = inputs.getFirst();
+
   fillAllInputs.apply(this);
 
   // Reset the scraper status
-  var input = inputs.getFirst();
   updateForm.call( this, input, input.first.value );
 });
 
