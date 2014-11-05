@@ -231,6 +231,18 @@ function updateForm( input, value ){
   this.evaluate( formEvaluator, input.id );
   this.echo( 'Evaluate form change: ' + input.id + ' TO: ' + value );
 
+  // Stop when 'to' value was scraped
+  if( input.to && input.to == value ){
+    var checkInput = input;
+    input.abort = true;
+    while( checkInput = checkInput.parent ){
+      if( !checkInput.current || checkInput.current.value != checkInput.to ){
+        input.abort = false;
+        break;
+      }
+    }
+  }
+
   while( input ){
     input.values = [];
     input.value = null;
@@ -258,6 +270,8 @@ function recursiveScraper(){
     }
     input = input.children;
   }
+
+
   if( !input.value || input.value == '0' || !( input.value in input.values ) ){
     if( !input.first ){
       updateForm.call( this, input.parent, input.parent.value );
@@ -281,16 +295,25 @@ function recursiveScraper(){
   // Page ready to be scraped:
   scrapePage.call( this );
 
+  // Check for abort
+  if (input.abort){
+    this.echo( 'Hit the finish defined by "to" argument... ' );
+    return;
+  }
+
   // Move to the next page:
   this.echo( 'Moving to the next... ' );
 
   if (input.current.next){
-    // Stop when 'to' value was scraped
-    if( input.current.value == input.to ) return;
     updateForm.call( this, input, input.current.next.value );
   } else {
     var parentInput = input.parent;
     while( parentInput && !parentInput.current.next ){
+      // Check for abort
+      if (parentInput.abort){
+        this.echo( 'Hit the finish defined by "to" argument... ' );
+        return;
+      }
       parentInput = parentInput.parent;
     }
     if (!parentInput){
@@ -301,8 +324,6 @@ function recursiveScraper(){
 }
 
 casper.then(function () {
-  debugger;
-
   this.echo('Reseting scraper to start the search');
 
   var input = inputs.getFirst();
