@@ -28,3 +28,17 @@ How it works
 It will create a folder called `pages` with all the tree of screaped pages, all scraped pages will save the HTML, PNG and a JSON with it data.
 
 The filename will be the date that you runned tha scraper. If something change you have a register of it.
+
+Install
+-------
+
+Install [casperjs](http://casperjs.org/).
+Clone the project `git clone https://github.com/gartz/EleicoesBrazilScraper.git`
+Run it: `casperjs eleicoes2014.js`
+
+Next steps
+----------
+
+* Create a script that read the JSON and saves in a RDBMS.
+* Create a server that allow API consulting the content with query filters.
+
