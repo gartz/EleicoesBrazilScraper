@@ -9,3 +9,22 @@ Running:
 ```
 casperjs eleicoes2014.js
 ```
+
+Run from a determined position:
+```
+casperjs eleicoes2014.js --from=158,SC
+```
+This example will run from second turn in SC
+
+Commands
+--------
+
+* **from**: comma separeted IDs where to begin the scraping.
+* **to**: comma separeted IDs where it should stop scraping.
+
+How it works
+------------
+
+It will create a folder called `pages` with all the tree of screaped pages, all scraped pages will save the HTML, PNG and a JSON with it data.
+
+The filename will be the date that you runned tha scraper. If something change you have a register of it.
